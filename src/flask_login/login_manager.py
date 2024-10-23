@@ -9,7 +9,7 @@ from flask import g
 from flask import redirect
 from flask import request
 from flask import session
-
+from flask_api import status
 from .config import COOKIE_DURATION
 from .config import COOKIE_HTTPONLY
 from .config import COOKIE_NAME
@@ -157,7 +157,7 @@ class LoginManager:
             login_view = self.login_view
 
         if not login_view:
-            abort(401)
+            abort(status.HTTP_401_UNAUTHORIZED)
 
         if self.login_message:
             if self.localize_callback is not None:
@@ -264,7 +264,7 @@ class LoginManager:
             return self.needs_refresh_callback()
 
         if not self.refresh_view:
-            abort(401)
+            abort(status.HTTP_401_UNAUTHORIZED)
 
         if self.needs_refresh_message:
             if self.localize_callback is not None:
