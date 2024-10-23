@@ -9,7 +9,7 @@ from flask import g
 from flask import redirect
 from flask import request
 from flask import session
-
+from flask_api import status
 from .config import COOKIE_DURATION
 from .config import COOKIE_HTTPONLY
 from .config import COOKIE_NAME
@@ -22,6 +22,8 @@ from .config import REFRESH_MESSAGE
 from .config import REFRESH_MESSAGE_CATEGORY
 from .config import SESSION_KEYS
 from .config import USE_SESSION_FOR_NEXT
+from .constants import SESSION_PROTECTION, REMEMBER_COOKIE_REFRESH_EACH_REQUEST, \
+    REMEMBER_SESSION_KEY, SET_SESSION, CLEAR_SESSION
 from .mixins import AnonymousUserMixin
 from .signals import session_protected
 from .signals import user_accessed
@@ -157,7 +159,7 @@ class LoginManager:
             login_view = self.login_view
 
         if not login_view:
-            abort(401)
+            abort(status.HTTP_401_UNAUTHORIZED)
 
         if self.login_message:
             if self.localize_callback is not None:
@@ -264,7 +266,7 @@ class LoginManager:
             return self.needs_refresh_callback()
 
         if not self.refresh_view:
-            abort(401)
+            abort(status.HTTP_401_UNAUTHORIZED)
 
         if self.needs_refresh_message:
             if self.localize_callback is not None:
@@ -326,7 +328,7 @@ class LoginManager:
             config = current_app.config
             cookie_name = config.get("REMEMBER_COOKIE_NAME", COOKIE_NAME)
             has_cookie = (
-                cookie_name in request.cookies and session.get("_remember") != "clear"
+                cookie_name in request.cookies and session.get(REMEMBER_SESSION_KEY) != CLEAR_SESSION
             )
             if has_cookie:
                 cookie = request.cookies[cookie_name]
@@ -341,7 +343,7 @@ class LoginManager:
         ident = self._session_identifier_generator()
 
         app = current_app._get_current_object()
-        mode = app.config.get("SESSION_PROTECTION", self.session_protection)
+        mode = app.config.get(SESSION_PROTECTION, self.session_protection)
 
         if not mode or mode not in ["basic", "strong"]:
             return False
@@ -358,7 +360,7 @@ class LoginManager:
                 for k in SESSION_KEYS:
                     sess.pop(k, None)
 
-                sess["_remember"] = "clear"
+                sess[REMEMBER_SESSION_KEY] = CLEAR_SESSION
                 session_protected.send(app)
                 return True
 
@@ -389,17 +391,17 @@ class LoginManager:
 
     def _update_remember_cookie(self, response):
         # Don't modify the session unless there's something to do.
-        if "_remember" not in session and current_app.config.get(
-            "REMEMBER_COOKIE_REFRESH_EACH_REQUEST"
+        if REMEMBER_SESSION_KEY not in session and current_app.config.get(
+            REMEMBER_COOKIE_REFRESH_EACH_REQUEST
         ):
-            session["_remember"] = "set"
+            session[REMEMBER_SESSION_KEY] = SET_SESSION
 
-        if "_remember" in session:
-            operation = session.pop("_remember", None)
+        if REMEMBER_SESSION_KEY in session:
+            operation = session.pop(REMEMBER_SESSION_KEY, None)
 
-            if operation == "set" and "_user_id" in session:
+            if operation == SET_SESSION and "_user_id" in session:
                 self._set_cookie(response)
-            elif operation == "clear":
+            elif operation == CLEAR_SESSION:
                 self._clear_cookie(response)
 
         return response
